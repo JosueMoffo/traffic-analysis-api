@@ -1,0 +1,2269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur de Circulation Avancé - Yaoundé</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h3 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .map-container {
+            height: 600px;
+            background: #f7fafc;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #e2e8f0;
+            cursor: crosshair;
+        }
+
+        .map {
+            width: 100%;
+            height: 100%;
+            background: #f0f8ff;
+            position: relative;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+        }
+
+        .road {
+            position: absolute;
+            background: linear-gradient(to right, #6b7280 0%, #9ca3af 50%, #6b7280 100%);
+            border: 1px solid #4b5563;
+            z-index: 2;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .road-horizontal {
+            height: 8px;
+        }
+
+        .road-vertical {
+            width: 8px;
+        }
+
+        .road-diagonal {
+            height: 8px;
+            transform-origin: left center;
+        }
+
+        .vehicle {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            transition: all 0.1s ease;
+            cursor: pointer;
+            z-index: 15;
+            border: 2px solid #1e40af;
+        }
+
+        .vehicle::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            width: 6px;
+            height: 6px;
+            background: #10b981;
+            border-radius: 50%;
+            border: 1px solid white;
+        }
+
+        .vehicle:hover {
+            transform: scale(1.2);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+        }
+
+        .vehicle.stopped {
+            background: linear-gradient(145deg, #ef4444, #dc2626);
+            border-color: #b91c1c;
+            animation: pulse 1.5s infinite;
+        }
+
+        .vehicle.stopped::after {
+            background: #f59e0b;
+        }
+
+        .vehicle.alternative {
+            background: linear-gradient(145deg, #10b981, #059669);
+            border-color: #047857;
+        }
+
+        .vehicle.alternative::after {
+            background: #3b82f6;
+        }
+
+        @keyframes waiting-pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4); }
+            50% { transform: scale(1.05); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6); }
+        }
+
+        .vehicle.waiting-clearance {
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            border-color: #92400e;
+            animation: waiting-pulse 2s ease-in-out infinite;
+        }
+
+        .vehicle.waiting-clearance::after {
+            background: #3b82f6;
+        }
+
+        .vehicle.blocked-permanently {
+            background: linear-gradient(145deg, #6b7280, #4b5563);
+            border-color: #374151;
+            animation: none;
+            filter: grayscale(50%);
+        }
+
+        .vehicle.blocked-permanently::after {
+            background: #ef4444;
+            animation: blocked-blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blocked-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+
+        .vehicle.roundabout-route {
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            border-color: #92400e;
+            animation: roundaboutPulse 2s ease-in-out infinite;
+        }
+
+        .vehicle.neighborhood-route {
+            background: linear-gradient(145deg, #8b5cf6, #7c3aed);
+            border-color: #6d28d9;
+        }
+
+        .vehicle.bypass-route {
+            background: linear-gradient(145deg, #06b6d4, #0891b2);
+            border-color: #0e7490;
+        }
+
+        @keyframes roundaboutPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .roundabout-path {
+            stroke: #f59e0b;
+            stroke-width: 5;
+            stroke-dasharray: 12, 8;
+            animation: dashFlow 2s linear infinite;
+        }
+
+        .neighborhood-path {
+            stroke: #8b5cf6;
+            stroke-width: 4;
+            stroke-dasharray: 8, 6;
+        }
+
+        .bypass-path {
+            stroke: #06b6d4;
+            stroke-width: 4;
+            stroke-dasharray: 6, 4;
+        }
+
+        @keyframes dashFlow {
+            0% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: 20; }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .landmark {
+            position: absolute;
+            background: linear-gradient(145deg, #8b5cf6, #7c3aed);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            z-index: 10;
+            border: 2px solid #6d28d9;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .landmark::before {
+            content: '📍';
+            margin-right: 5px;
+        }
+
+        .landmark.rond-point {
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            border: 3px solid #92400e;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 11px;
+            line-height: 1.2;
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+            animation: roundaboutGlow 3s ease-in-out infinite alternate;
+        }
+
+        .landmark.rond-point::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px dashed #fbbf24;
+            border-radius: 50%;
+            animation: rotate 10s linear infinite;
+        }
+
+        @keyframes roundaboutGlow {
+            from { box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4); }
+            to { box-shadow: 0 10px 30px rgba(245, 158, 11, 0.7); }
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .route-path {
+            position: absolute;
+            stroke: #3b82f6;
+            stroke-width: 4;
+            fill: none;
+            stroke-dasharray: 5, 5;
+            z-index: 5;
+            opacity: 0.8;
+        }
+
+        .alternative-path {
+            stroke: #10b981;
+            stroke-width: 4;
+            stroke-dasharray: 8, 4;
+        }
+
+        .obstacle {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(145deg, #ef4444, #dc2626);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: move;
+            z-index: 12;
+            border: 3px solid #b91c1c;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            animation: obstacleGlow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes obstacleGlow {
+            from { box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); }
+            to { box-shadow: 0 8px 25px rgba(239, 68, 68, 0.8); }
+        }
+
+        .obstacle::before {
+            content: '🚧';
+        }
+
+        .vehicle-trail {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(59, 130, 246, 0.3);
+            border-radius: 50%;
+            z-index: 3;
+            pointer-events: none;
+            animation: fadeTrail 2s ease-out forwards;
+        }
+
+        @keyframes fadeTrail {
+            0% { opacity: 0.6; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.5); }
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, #3b82f6, #1d4ed8);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(145deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(145deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(145deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .obstacle-controls {
+            background: #fef2f2;
+            border: 2px solid #fecaca;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .obstacle-controls h4 {
+            color: #dc2626;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .status-panel {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 13px;
+        }
+
+        .status-value {
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .status-value.good {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-value.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-value.danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .vehicle-info {
+            background: #f0f9ff;
+            border: 2px solid #bae6fd;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .vehicle-info h4 {
+            color: #0369a1;
+            margin-bottom: 8px;
+        }
+
+        .log-panel {
+            background: #1f2937;
+            color: #f3f4f6;
+            border-radius: 10px;
+            padding: 20px;
+            height: 250px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+        }
+
+        .log-entry.info {
+            background: rgba(59, 130, 246, 0.1);
+            border-left-color: #3b82f6;
+        }
+
+        .log-entry.success {
+            background: rgba(16, 185, 129, 0.1);
+            border-left-color: #10b981;
+        }
+
+        .log-entry.warning {
+            background: rgba(245, 158, 11, 0.1);
+            border-left-color: #f59e0b;
+        }
+
+        .log-entry.error {
+            background: rgba(239, 68, 68, 0.1);
+            border-left-color: #ef4444;
+        }
+
+        .alternatives-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            z-index: 1000;
+            max-width: 500px;
+            width: 90%;
+            display: none;
+            border: 3px solid #dc2626;
+        }
+
+        .alternatives-panel.show {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+
+        .alternatives-panel::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: -1;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .close-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: #dc2626;
+            transform: scale(1.1);
+        }
+
+        .alternatives-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .alternative-option {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .alternative-option:hover {
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .alternative-option.selected {
+            border-color: #10b981;
+            background: linear-gradient(145deg, #f0fdf4, #ecfdf5);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .alternative-option.selected::before {
+            content: '✓ SÉLECTIONNÉ';
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .alternative-option.selected h4 {
+            color: #059669;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+
+        .timer-display {
+            background: #dc2626;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 16px;
+            animation: timerBlink 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes timerBlink {
+            from { background: #dc2626; }
+            to { background: #b91c1c; }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Simulateur Avancé - Circulation Yaoundé</h1>
+            <p>Système Intelligent avec Routes Précises et Gestion d'Obstacles</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- Panneau de contrôle gauche -->
+            <div class="panel">
+                <h3>🎮 Contrôles de Simulation</h3>
+                
+                <div class="form-group">
+                    <label>Vitesse de simulation:</label>
+                    <input type="range" id="simulationSpeed" min="1" max="10" value="3" style="width: 100%;">
+                    <div style="text-align: center; font-weight: bold; color: #3b82f6;" id="speedValue">3x</div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn btn-primary" id="startSimulation">▶️ Démarrer</button>
+                    <button class="btn btn-warning" id="pauseSimulation">⏸️ Pause</button>
+                </div>
+
+                <button class="btn btn-danger" id="stopSimulation">⏹️ Arrêter & Reset</button>
+
+                <div class="form-group" style="margin-top: 20px;">
+                    <label for="vehicleId">ID Véhicule:</label>
+                    <input type="text" id="vehicleId" value="VEH-001" placeholder="Ex: VEH-001">
+                </div>
+
+                <div class="form-group">
+                    <label for="origin">Point de départ:</label>
+                    <select id="origin">
+                        <option value="poste_centrale">📮 Poste Centrale</option>
+                        <option value="cradat">🏢 CRADAT</option>
+                        <option value="nlongkak">🏘️ Nlongkak</option>
+                        <option value="mvan">🌆 Mvan</option>
+                        <option value="bastos">🏙️ Bastos</option>
+                        <option value="omnisport">🏟️ Omnisport</option>
+                        <option value="rond_point_central">🎯 Rond-Point Central</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="destination">Destination:</label>
+                    <select id="destination">
+                        <option value="cradat">🏢 CRADAT</option>
+                        <option value="poste_centrale">📮 Poste Centrale</option>
+                        <option value="nlongkak">🏘️ Nlongkak</option>
+                        <option value="mvan">🌆 Mvan</option>
+                        <option value="bastos">🏙️ Bastos</option>
+                        <option value="omnisport">🏟️ Omnisport</option>
+                        <option value="rond_point_central">🎯 Rond-Point Central</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-primary" id="calculateRoute">🗺️ Calculer & Lancer</button>
+
+                <div class="obstacle-controls">
+                    <h4>🚧 Gestion d'Obstacles</h4>
+                    <button class="btn btn-danger" id="enableObstacleMode">📍 Placer Obstacle</button>
+                    <button class="btn btn-warning" id="clearObstacles">🧹 Nettoyer</button>
+                    <button class="btn btn-success" onclick="demonstrateRoundabout()" style="margin-top: 8px;">🎯 Démo Rond-Point</button>
+                    <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                        Cliquez sur la carte pour placer un obstacle
+                    </p>
+                </div>
+            </div>
+
+            <!-- Carte principale -->
+            <div class="panel">
+                <h3>🗺️ Carte Interactive - Yaoundé</h3>
+                <div class="map-container">
+                    <div class="map" id="yaoundeMap">
+                        <!-- SVG pour les chemins -->
+                        <svg style="position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: 4;" id="routeSVG">
+                        </svg>
+                        
+                        <!-- Landmarks de Yaoundé avec rond-point central -->
+                        <div class="landmark" style="top: 15%; left: 20%;" data-location="poste_centrale">Poste Centrale</div>
+                        <div class="landmark" style="top: 20%; left: 75%;" data-location="cradat">CRADAT</div>
+                        <div class="landmark" style="top: 55%; left: 15%;" data-location="nlongkak">Nlongkak</div>
+                        <div class="landmark" style="top: 70%; left: 50%;" data-location="mvan">Mvan</div>
+                        <div class="landmark" style="top: 35%; left: 80%;" data-location="bastos">Bastos</div>
+                        <div class="landmark" style="top: 85%; left: 25%;" data-location="omnisport">Omnisport</div>
+                        
+                        <!-- NOUVEAU: Rond-Point Central -->
+                        <div class="landmark rond-point" style="top: 45%; left: 50%;" data-location="rond_point_central">
+                            🎯 Rond-Point Central
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panneau d'information droite -->
+            <div class="panel">
+                <h3>📊 Informations Temps Réel</h3>
+                
+                <div id="vehicleDetails" class="vehicle-info" style="display: none;">
+                    <h4>🚗 Véhicule Sélectionné</h4>
+                    <div id="vehicleDetailsContent"></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="journeyProgress" style="width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 11px; color: #6b7280;">Progression du trajet</div>
+                </div>
+
+                <div class="status-panel">
+                    <div class="status-item">
+                        <span class="status-label">Véhicules actifs:</span>
+                        <span class="status-value good" id="activeVehicles">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Obstacles placés:</span>
+                        <span class="status-value warning" id="obstacleCount">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Embouteillages:</span>
+                        <span class="status-value danger" id="trafficJams">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Alternatives proposées:</span>
+                        <span class="status-value good" id="alternativesCount">0</span>
+                    </div>
+                </div>
+
+                <div class="log-panel" id="activityLog">
+                    <div class="log-entry info">🎮 Simulateur initialisé</div>
+                    <div class="log-entry success">📡 Connexion API simulée</div>
+                    <div class="log-entry info">💡 Cliquez sur "Calculer & Lancer" pour commencer</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel d'alternatives (popup) -->
+    <div class="alternatives-panel" id="alternativesPanel">
+        <h3 style="color: #dc2626; margin-bottom: 15px;">⚠️ Embouteillage Détecté!</h3>
+        <div class="timer-display" id="stoppedTimer">Arrêté depuis: 0:00</div>
+        <p style="margin-bottom: 20px; color: #6b7280;">
+            Le véhicule est bloqué par un obstacle. Voici les alternatives disponibles:
+        </p>
+        <div id="alternativesList"></div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-success" id="acceptAlternative" style="flex: 1;">✅ Accepter</button>
+            <button class="btn btn-danger" id="rejectAlternative" style="flex: 1;">❌ Refuser</button>
+            <button class="btn btn-warning" id="ignoreAlternative" style="flex: 1;">⏭️ Attendre</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // CONFIGURATION ET DONNÉES
+        // ==========================================
+
+        const landmarks = {
+            poste_centrale: { x: 20, y: 15, name: "Poste Centrale" },
+            cradat: { x: 75, y: 20, name: "CRADAT" },
+            nlongkak: { x: 15, y: 55, name: "Nlongkak" },
+            mvan: { x: 50, y: 70, name: "Mvan" },
+            bastos: { x: 80, y: 35, name: "Bastos" },
+            omnisport: { x: 25, y: 85, name: "Omnisport" },
+            rond_point_central: { x: 50, y: 45, name: "Rond-Point Central" } // NOUVEAU
+        };
+
+        // Réseau routier de Yaoundé avec rond-point central
+        const roadNetwork = {
+            poste_centrale: {
+                cradat: [
+                    { x: 20, y: 15 }, { x: 35, y: 15 }, { x: 50, y: 18 }, { x: 65, y: 20 }, { x: 75, y: 20 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 20, y: 15 }, { x: 30, y: 25 }, { x: 40, y: 35 }, { x: 50, y: 45 }
+                ],
+                nlongkak: [
+                    { x: 20, y: 15 }, { x: 18, y: 25 }, { x: 16, y: 40 }, { x: 15, y: 55 }
+                ],
+                mvan: [
+                    { x: 20, y: 15 }, { x: 25, y: 30 }, { x: 35, y: 50 }, { x: 50, y: 70 }
+                ],
+                bastos: [
+                    { x: 20, y: 15 }, { x: 40, y: 18 }, { x: 60, y: 25 }, { x: 80, y: 35 }
+                ],
+                omnisport: [
+                    { x: 20, y: 15 }, { x: 22, y: 35 }, { x: 24, y: 60 }, { x: 25, y: 85 }
+                ]
+            },
+            cradat: {
+                poste_centrale: [
+                    { x: 75, y: 20 }, { x: 65, y: 20 }, { x: 50, y: 18 }, { x: 35, y: 15 }, { x: 20, y: 15 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 75, y: 20 }, { x: 65, y: 30 }, { x: 58, y: 38 }, { x: 50, y: 45 }
+                ],
+                nlongkak: [
+                    { x: 75, y: 20 }, { x: 60, y: 25 }, { x: 40, y: 35 }, { x: 25, y: 45 }, { x: 15, y: 55 }
+                ],
+                mvan: [
+                    { x: 75, y: 20 }, { x: 70, y: 35 }, { x: 60, y: 50 }, { x: 50, y: 70 }
+                ],
+                bastos: [
+                    { x: 75, y: 20 }, { x: 78, y: 28 }, { x: 80, y: 35 }
+                ],
+                omnisport: [
+                    { x: 75, y: 20 }, { x: 60, y: 35 }, { x: 45, y: 55 }, { x: 35, y: 75 }, { x: 25, y: 85 }
+                ]
+            },
+            nlongkak: {
+                poste_centrale: [
+                    { x: 15, y: 55 }, { x: 16, y: 40 }, { x: 18, y: 25 }, { x: 20, y: 15 }
+                ],
+                cradat: [
+                    { x: 15, y: 55 }, { x: 25, y: 45 }, { x: 40, y: 35 }, { x: 60, y: 25 }, { x: 75, y: 20 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 15, y: 55 }, { x: 25, y: 52 }, { x: 35, y: 48 }, { x: 50, y: 45 }
+                ],
+                mvan: [
+                    { x: 15, y: 55 }, { x: 25, y: 60 }, { x: 38, y: 68 }, { x: 50, y: 70 }
+                ],
+                bastos: [
+                    { x: 15, y: 55 }, { x: 35, y: 50 }, { x: 55, y: 45 }, { x: 70, y: 40 }, { x: 80, y: 35 }
+                ],
+                omnisport: [
+                    { x: 15, y: 55 }, { x: 18, y: 70 }, { x: 22, y: 80 }, { x: 25, y: 85 }
+                ]
+            },
+            mvan: {
+                poste_centrale: [
+                    { x: 50, y: 70 }, { x: 35, y: 50 }, { x: 25, y: 30 }, { x: 20, y: 15 }
+                ],
+                cradat: [
+                    { x: 50, y: 70 }, { x: 60, y: 50 }, { x: 70, y: 35 }, { x: 75, y: 20 }
+                ],
+                nlongkak: [
+                    { x: 50, y: 70 }, { x: 38, y: 68 }, { x: 25, y: 60 }, { x: 15, y: 55 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 50, y: 70 }, { x: 50, y: 60 }, { x: 50, y: 52 }, { x: 50, y: 45 }
+                ],
+                bastos: [
+                    { x: 50, y: 70 }, { x: 65, y: 60 }, { x: 75, y: 50 }, { x: 80, y: 35 }
+                ],
+                omnisport: [
+                    { x: 50, y: 70 }, { x: 40, y: 75 }, { x: 32, y: 82 }, { x: 25, y: 85 }
+                ]
+            },
+            bastos: {
+                poste_centrale: [
+                    { x: 80, y: 35 }, { x: 60, y: 25 }, { x: 40, y: 18 }, { x: 20, y: 15 }
+                ],
+                cradat: [
+                    { x: 80, y: 35 }, { x: 78, y: 28 }, { x: 75, y: 20 }
+                ],
+                nlongkak: [
+                    { x: 80, y: 35 }, { x: 70, y: 40 }, { x: 55, y: 45 }, { x: 35, y: 50 }, { x: 15, y: 55 }
+                ],
+                mvan: [
+                    { x: 80, y: 35 }, { x: 75, y: 50 }, { x: 65, y: 60 }, { x: 50, y: 70 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 80, y: 35 }, { x: 70, y: 38 }, { x: 60, y: 42 }, { x: 50, y: 45 }
+                ],
+                omnisport: [
+                    { x: 80, y: 35 }, { x: 70, y: 55 }, { x: 55, y: 70 }, { x: 40, y: 80 }, { x: 25, y: 85 }
+                ]
+            },
+            omnisport: {
+                poste_centrale: [
+                    { x: 25, y: 85 }, { x: 24, y: 60 }, { x: 22, y: 35 }, { x: 20, y: 15 }
+                ],
+                cradat: [
+                    { x: 25, y: 85 }, { x: 35, y: 75 }, { x: 45, y: 55 }, { x: 60, y: 35 }, { x: 75, y: 20 }
+                ],
+                nlongkak: [
+                    { x: 25, y: 85 }, { x: 22, y: 80 }, { x: 18, y: 70 }, { x: 15, y: 55 }
+                ],
+                mvan: [
+                    { x: 25, y: 85 }, { x: 32, y: 82 }, { x: 40, y: 75 }, { x: 50, y: 70 }
+                ],
+                bastos: [
+                    { x: 25, y: 85 }, { x: 40, y: 80 }, { x: 55, y: 70 }, { x: 70, y: 55 }, { x: 80, y: 35 }
+                ],
+                // Route directe vers le rond-point
+                rond_point_central: [
+                    { x: 25, y: 85 }, { x: 30, y: 75 }, { x: 38, y: 60 }, { x: 45, y: 50 }, { x: 50, y: 45 }
+                ]
+            },
+            // NOUVEAU : Routes depuis le rond-point vers tous les quartiers
+            rond_point_central: {
+                poste_centrale: [
+                    { x: 50, y: 45 }, { x: 40, y: 35 }, { x: 30, y: 25 }, { x: 20, y: 15 }
+                ],
+                cradat: [
+                    { x: 50, y: 45 }, { x: 58, y: 38 }, { x: 65, y: 30 }, { x: 75, y: 20 }
+                ],
+                nlongkak: [
+                    { x: 50, y: 45 }, { x: 35, y: 48 }, { x: 25, y: 52 }, { x: 15, y: 55 }
+                ],
+                mvan: [
+                    { x: 50, y: 45 }, { x: 50, y: 52 }, { x: 50, y: 60 }, { x: 50, y: 70 }
+                ],
+                bastos: [
+                    { x: 50, y: 45 }, { x: 60, y: 42 }, { x: 70, y: 38 }, { x: 80, y: 35 }
+                ],
+                omnisport: [
+                    { x: 50, y: 45 }, { x: 45, y: 50 }, { x: 38, y: 60 }, { x: 30, y: 75 }, { x: 25, y: 85 }
+                ]
+            }
+        };
+
+        let vehicles = new Map();
+        let obstacles = new Set();
+        let currentRoute = null;
+        let simulationRunning = false;
+        let simulationSpeed = 3;
+        let vehicleCounter = 1;
+        let obstacleMode = false;
+        let selectedVehicle = null;
+        let alternativeTimer = null;
+
+        // ==========================================
+        // CLASSES PRINCIPALES
+        // ==========================================
+
+        class Vehicle {
+            constructor(id, origin, destination) {
+                this.id = id;
+                this.origin = origin;
+                this.destination = destination;
+                this.currentPosition = { ...landmarks[origin] };
+                this.routePath = roadNetwork[origin][destination] || [];
+                this.pathIndex = 0;
+                this.speed = 25 + Math.random() * 15; // 25-40 km/h
+                this.status = 'moving';
+                this.stoppedTime = 0;
+                this.element = null;
+                this.trail = [];
+                this.totalDistance = this.calculateTotalDistance();
+                this.traveledDistance = 0;
+                this.blockedBy = null;
+                this.createDOMElement();
+                this.drawRoute();
+            }
+
+            calculateTotalDistance() {
+                let total = 0;
+                for (let i = 0; i < this.routePath.length - 1; i++) {
+                    const p1 = this.routePath[i];
+                    const p2 = this.routePath[i + 1];
+                    total += Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+                }
+                return total;
+            }
+
+            createDOMElement() {
+                this.element = document.createElement('div');
+                this.element.className = 'vehicle';
+                this.element.textContent = this.id.slice(-1);
+                this.element.style.left = this.currentPosition.x + '%';
+                this.element.style.top = this.currentPosition.y + '%';
+                this.element.title = `${this.id}: ${landmarks[this.origin].name} → ${landmarks[this.destination].name}`;
+                
+                this.element.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.select();
+                });
+
+                document.getElementById('yaoundeMap').appendChild(this.element);
+            }
+
+            drawRoute() {
+                const svg = document.getElementById('routeSVG');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                
+                if (this.routePath.length < 2) return;
+
+                let pathData = `M ${this.routePath[0].x} ${this.routePath[0].y}`;
+                for (let i = 1; i < this.routePath.length; i++) {
+                    pathData += ` L ${this.routePath[i].x} ${this.routePath[i].y}`;
+                }
+
+                path.setAttribute('d', pathData);
+                path.setAttribute('class', 'route-path');
+                path.setAttribute('data-vehicle', this.id);
+                svg.appendChild(path);
+            }
+
+            move() {
+                // Ne pas bouger si bloqué en permanence ou en attente
+                if (this.status === 'blocked_permanently' || this.status === 'waiting_for_clearance') {
+                    return;
+                }
+
+                if (this.status === 'stopped' || this.pathIndex >= this.routePath.length - 1) {
+                    if (this.status === 'stopped') {
+                        this.stoppedTime += 100 / simulationSpeed;
+                        if (this.stoppedTime >= 5000) { // 5 seconds = 5 minutes simulation
+                            this.detectTrafficJam();
+                        }
+                        this.updateStoppedTimer();
+                    }
+                    return;
+                }
+
+                // Vérifier les obstacles (seulement si en mouvement normal)
+                if (this.status === 'moving' && this.checkObstacles()) {
+                    this.stop('obstacle');
+                    return;
+                }
+
+                const target = this.routePath[this.pathIndex + 1];
+                const current = this.currentPosition;
+                
+                const dx = target.x - current.x;
+                const dy = target.y - current.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < 1) {
+                    this.pathIndex++;
+                    if (this.pathIndex >= this.routePath.length - 1) {
+                        this.reachDestination();
+                        return;
+                    }
+                } else {
+                    const moveDistance = (this.speed / 100) * (simulationSpeed / 3);
+                    const moveX = (dx / distance) * moveDistance;
+                    const moveY = (dy / distance) * moveDistance;
+
+                    this.currentPosition.x += moveX;
+                    this.currentPosition.y += moveY;
+                    this.traveledDistance += moveDistance;
+
+                    // Ajouter trail
+                    this.addTrail();
+                }
+
+                this.updatePosition();
+                this.updateProgress();
+            }
+
+            checkObstacles() {
+                for (let obstacle of obstacles) {
+                    const dist = Math.sqrt(
+                        (this.currentPosition.x - obstacle.x) ** 2 + 
+                        (this.currentPosition.y - obstacle.y) ** 2
+                    );
+                    if (dist < 5) { // 5% de distance sur la carte
+                        this.blockedBy = obstacle;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            stop(reason) {
+                if (this.status !== 'stopped') {
+                    this.status = 'stopped';
+                    this.element.classList.add('stopped');
+                    this.stoppedTime = 0;
+                    logActivity(`🚨 ${this.id} arrêté (${reason})`, 'warning');
+                }
+            }
+
+            resume() {
+                this.status = 'moving';
+                this.element.classList.remove('stopped');
+                this.stoppedTime = 0;
+                this.blockedBy = null;
+                logActivity(`✅ ${this.id} reprend sa route`, 'success');
+            }
+
+            detectTrafficJam() {
+                if (this.blockedBy) {
+                    logActivity(`⚠️ Embouteillage détecté pour ${this.id} (arrêt depuis 5+ min)`, 'error');
+                    this.proposeAlternatives();
+                }
+            }
+
+            proposeAlternatives() {
+                const alternatives = this.calculateAlternatives();
+                showAlternativePanel(this, alternatives);
+            }
+
+            calculateAlternatives() {
+                const alternatives = [];
+                
+                // Alternative 1: Retour au rond-point central
+                if (this.origin !== 'rond_point_central' && this.destination !== 'rond_point_central') {
+                    const backtrackPath = this.generateBacktrackToRoundabout();
+                    alternatives.push({
+                        id: 'alt1',
+                        name: `🔄 Retour par le Rond-Point Central`,
+                        path: backtrackPath,
+                        distance: this.calculatePathDistance(backtrackPath),
+                        time: 12 + Math.random() * 6,
+                        confidence: 0.9 + Math.random() * 0.08,
+                        type: 'roundabout_detour'
+                    });
+                }
+                
+                // Alternative 2: Détour par un autre quartier
+                const detourPath = this.generateDetourViaNeighborhood();
+                alternatives.push({
+                    id: 'alt2',
+                    name: `🌆 Détour via ${this.getDetourNeighborhood()}`,
+                    path: detourPath,
+                    distance: this.calculatePathDistance(detourPath),
+                    time: 8 + Math.random() * 5,
+                    confidence: 0.75 + Math.random() * 0.2,
+                    type: 'neighborhood_detour'
+                });
+                
+                // Alternative 3: Route de contournement simple
+                const bypassPath = this.generateSimpleBypass();
+                alternatives.push({
+                    id: 'alt3',
+                    name: `🛣️ Contournement direct`,
+                    path: bypassPath,
+                    distance: this.calculatePathDistance(bypassPath),
+                    time: 6 + Math.random() * 4,
+                    confidence: 0.65 + Math.random() * 0.25,
+                    type: 'direct_bypass'
+                });
+
+                return alternatives;
+            }
+
+            generateBacktrackToRoundabout() {
+                // Retourner en arrière jusqu'au rond-point puis aller à destination
+                const currentPos = { ...this.currentPosition };
+                const roundabout = landmarks['rond_point_central'];
+                const destination = landmarks[this.destination];
+                
+                // 1. Chemin de retour vers le rond-point
+                const backtrackSteps = Math.floor(this.pathIndex * 0.7); // Retour partiel
+                const backtrackStart = Math.max(0, this.pathIndex - backtrackSteps);
+                const backtrackPath = [];
+                
+                // Rebrousser chemin
+                for (let i = this.pathIndex; i >= backtrackStart; i--) {
+                    if (this.routePath[i]) {
+                        backtrackPath.push({ ...this.routePath[i] });
+                    }
+                }
+                
+                // 2. Route du point de retour vers le rond-point
+                const returnPoint = backtrackPath[backtrackPath.length - 1] || currentPos;
+                const toRoundaboutPath = this.interpolatePath(returnPoint, roundabout, 3);
+                backtrackPath.push(...toRoundaboutPath);
+                
+                // 3. Route du rond-point vers la destination finale
+                if (roadNetwork['rond_point_central'] && roadNetwork['rond_point_central'][this.destination]) {
+                    const finalPath = roadNetwork['rond_point_central'][this.destination];
+                    backtrackPath.push(...finalPath);
+                } else {
+                    const toDestinationPath = this.interpolatePath(roundabout, destination, 4);
+                    backtrackPath.push(...toDestinationPath);
+                }
+                
+                return backtrackPath;
+            }
+            
+            generateDetourViaNeighborhood() {
+                const currentPos = { ...this.currentPosition };
+                const detourNeighborhood = this.selectDetourNeighborhood();
+                const detourPoint = landmarks[detourNeighborhood];
+                const destination = landmarks[this.destination];
+                
+                const detourPath = [currentPos];
+                
+                // Aller vers le quartier de détour
+                const toDetourPath = this.interpolatePath(currentPos, detourPoint, 3);
+                detourPath.push(...toDetourPath);
+                
+                // Du quartier de détour vers la destination
+                if (roadNetwork[detourNeighborhood] && roadNetwork[detourNeighborhood][this.destination]) {
+                    const finalPath = roadNetwork[detourNeighborhood][this.destination];
+                    detourPath.push(...finalPath);
+                } else {
+                    const toDestinationPath = this.interpolatePath(detourPoint, destination, 3);
+                    detourPath.push(...toDestinationPath);
+                }
+                
+                return detourPath;
+            }
+            
+            generateSimpleBypass() {
+                const currentPos = { ...this.currentPosition };
+                const destination = landmarks[this.destination];
+                const obstaclePos = this.blockedBy ? this.blockedBy : { x: currentPos.x + 10, y: currentPos.y + 5 };
+                
+                const bypassPath = [currentPos];
+                
+                // Contournement simple de l'obstacle
+                const detourDistance = 15;
+                const bypassPoint1 = {
+                    x: Math.max(5, Math.min(95, currentPos.x + (obstaclePos.x > currentPos.x ? -detourDistance : detourDistance))),
+                    y: Math.max(5, Math.min(95, currentPos.y + (obstaclePos.y > currentPos.y ? -detourDistance : detourDistance)))
+                };
+                
+                const bypassPoint2 = {
+                    x: Math.max(5, Math.min(95, destination.x + (Math.random() - 0.5) * 10)),
+                    y: Math.max(5, Math.min(95, destination.y + (Math.random() - 0.5) * 10))
+                };
+                
+                bypassPath.push(bypassPoint1, bypassPoint2, destination);
+                
+                return bypassPath;
+            }
+            
+            selectDetourNeighborhood() {
+                const neighborhoods = Object.keys(landmarks).filter(loc => 
+                    loc !== this.origin && 
+                    loc !== this.destination && 
+                    loc !== 'rond_point_central'
+                );
+                return neighborhoods[Math.floor(Math.random() * neighborhoods.length)];
+            }
+            
+            getDetourNeighborhood() {
+                const detourLoc = this.selectDetourNeighborhood();
+                return landmarks[detourLoc] ? landmarks[detourLoc].name : 'Quartier Alternatif';
+            }
+            
+            interpolatePath(start, end, steps) {
+                const path = [];
+                for (let i = 1; i <= steps; i++) {
+                    const t = i / (steps + 1);
+                    const point = {
+                        x: start.x + (end.x - start.x) * t + (Math.random() - 0.5) * 5,
+                        y: start.y + (end.y - start.y) * t + (Math.random() - 0.5) * 5
+                    };
+                    // S'assurer que les points restent dans la carte
+                    point.x = Math.max(5, Math.min(95, point.x));
+                    point.y = Math.max(5, Math.min(95, point.y));
+                    path.push(point);
+                }
+                return path;
+            }
+            
+            calculatePathDistance(path) {
+                if (path.length < 2) return 0;
+                
+                let distance = 0;
+                for (let i = 0; i < path.length - 1; i++) {
+                    const p1 = path[i];
+                    const p2 = path[i + 1];
+                    distance += Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+                }
+                return distance * 0.1; // Conversion en km approximative
+            }
+
+            getIntermediateLocation() {
+                const locations = Object.keys(landmarks).filter(loc => 
+                    loc !== this.origin && loc !== this.destination
+                );
+                return landmarks[locations[Math.floor(Math.random() * locations.length)]].name;
+            }
+
+            generateAlternativePath(variant) {
+                // Générer un chemin alternatif basé sur la position actuelle
+                const start = { ...this.currentPosition };
+                const end = landmarks[this.destination];
+                
+                const path = [start];
+                
+                // Calculer la position de l'obstacle pour l'éviter
+                const obstaclePos = this.blockedBy ? this.blockedBy : { x: start.x + 10, y: start.y + 5 };
+                
+                // Ajouter points intermédiaires pour éviter l'obstacle
+                if (variant === 1) {
+                    // Route via Mvan - contournement par le sud/est
+                    const detourDistance = 20; // Distance de détour
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, start.x + (obstaclePos.y > start.y ? -detourDistance : detourDistance))),
+                        y: Math.max(5, Math.min(95, start.y + detourDistance))
+                    });
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, start.x + (end.x - start.x) * 0.6)),
+                        y: Math.max(5, Math.min(95, start.y + (end.y - start.y) * 0.7))
+                    });
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, end.x - 5)),
+                        y: Math.max(5, Math.min(95, end.y))
+                    });
+                    
+                } else {
+                    // Route de contournement rapide - contournement par le nord/ouest
+                    const detourDistance = 15;
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, start.x + (obstaclePos.x > start.x ? -detourDistance : detourDistance))),
+                        y: Math.max(5, Math.min(95, start.y - detourDistance))
+                    });
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, start.x + (end.x - start.x) * 0.4)),
+                        y: Math.max(5, Math.min(95, start.y + (end.y - start.y) * 0.3))
+                    });
+                    
+                    path.push({
+                        x: Math.max(5, Math.min(95, end.x + 3)),
+                        y: Math.max(5, Math.min(95, end.y - 2))
+                    });
+                }
+                
+                path.push(end);
+                
+                // Log pour debug
+                console.log(`Alternative ${variant} générée:`, path);
+                
+                return path;
+            }
+
+            acceptAlternative(alternativePath, alternativeName, alternativeType) {
+                // Enregistrer l'ancienne route pour comparaison
+                const oldRouteLength = this.routePath.length;
+                
+                // Appliquer la nouvelle route
+                this.routePath = alternativePath;
+                this.pathIndex = 0;
+                
+                // Styles différents selon le type d'alternative
+                this.element.classList.add('alternative');
+                if (alternativeType === 'roundabout_detour') {
+                    this.element.classList.add('roundabout-route');
+                } else if (alternativeType === 'neighborhood_detour') {
+                    this.element.classList.add('neighborhood-route');
+                } else {
+                    this.element.classList.add('bypass-route');
+                }
+                
+                // Supprimer l'ancienne route du SVG
+                const oldRoutes = document.querySelectorAll(`[data-vehicle="${this.id}"]`);
+                oldRoutes.forEach(route => route.remove());
+                
+                // Dessiner la nouvelle route alternative
+                this.drawAlternativeRoute(alternativeType);
+                this.resume();
+                hideAlternativePanel();
+                
+                // Messages spécifiques selon le type
+                if (alternativeType === 'roundabout_detour') {
+                    logActivity(`🔄 ${this.id} fait demi-tour vers le Rond-Point Central`, 'success');
+                    logActivity(`🎯 Nouvelle route: ${this.origin} → Rond-Point → ${this.destination}`, 'info');
+                } else if (alternativeType === 'neighborhood_detour') {
+                    logActivity(`🌆 ${this.id} passe par un quartier alternatif: ${alternativeName}`, 'success');
+                } else {
+                    logActivity(`🛣️ ${this.id} prend un contournement direct`, 'success');
+                }
+                
+                logActivity(`📊 Nouvelle route: ${alternativePath.length} points de passage`, 'info');
+            }
+
+            rejectAlternative() {
+                hideAlternativePanel();
+                logActivity(`❌ ${this.id} reste en attente`, 'warning');
+            }
+
+            drawAlternativeRoute(alternativeType = 'default') {
+                const svg = document.getElementById('routeSVG');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                
+                if (this.routePath.length < 2) {
+                    logActivity(`⚠️ Route alternative invalide pour ${this.id}`, 'warning');
+                    return;
+                }
+
+                let pathData = `M ${this.routePath[0].x} ${this.routePath[0].y}`;
+                for (let i = 1; i < this.routePath.length; i++) {
+                    pathData += ` L ${this.routePath[i].x} ${this.routePath[i].y}`;
+                }
+
+                path.setAttribute('d', pathData);
+                
+                // Styles différents selon le type d'alternative
+                if (alternativeType === 'roundabout_detour') {
+                    path.setAttribute('class', 'roundabout-path');
+                    logActivity(`🎯 Route tracée via Rond-Point Central`, 'info');
+                } else if (alternativeType === 'neighborhood_detour') {
+                    path.setAttribute('class', 'neighborhood-path');
+                    logActivity(`🌆 Route tracée via quartier alternatif`, 'info');
+                } else if (alternativeType === 'direct_bypass') {
+                    path.setAttribute('class', 'bypass-path');
+                    logActivity(`🛣️ Route de contournement tracée`, 'info');
+                } else {
+                    path.setAttribute('class', 'alternative-path');
+                }
+                
+                path.setAttribute('data-vehicle', this.id + '-alt');
+                path.setAttribute('stroke-width', '6');
+                svg.appendChild(path);
+                
+                logActivity(`🗺️ Route alternative active pour ${this.id}`, 'success');
+            }
+
+            addTrail() {
+                if (this.trail.length > 15) {
+                    const oldTrail = this.trail.shift();
+                    if (oldTrail.element && oldTrail.element.parentNode) {
+                        oldTrail.element.remove();
+                    }
+                }
+
+                const trail = document.createElement('div');
+                trail.className = 'vehicle-trail';
+                trail.style.left = this.currentPosition.x + '%';
+                trail.style.top = this.currentPosition.y + '%';
+                
+                document.getElementById('yaoundeMap').appendChild(trail);
+                
+                this.trail.push({
+                    element: trail,
+                    position: { ...this.currentPosition }
+                });
+
+                setTimeout(() => {
+                    if (trail.parentNode) trail.remove();
+                }, 2000);
+            }
+
+            updatePosition() {
+                this.element.style.left = this.currentPosition.x + '%';
+                this.element.style.top = this.currentPosition.y + '%';
+            }
+
+            updateProgress() {
+                if (selectedVehicle === this) {
+                    const progress = Math.min(100, (this.traveledDistance / this.totalDistance) * 100);
+                    document.getElementById('journeyProgress').style.width = progress + '%';
+                }
+            }
+
+            updateStoppedTimer() {
+                if (this.status === 'stopped' && selectedVehicle === this) {
+                    const minutes = Math.floor(this.stoppedTime / 60000);
+                    const seconds = Math.floor((this.stoppedTime % 60000) / 1000);
+                    document.getElementById('stoppedTimer').textContent = 
+                        `Arrêté depuis: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+
+            select() {
+                // Désélectionner le véhicule précédent
+                if (selectedVehicle) {
+                    selectedVehicle.element.style.border = '2px solid #1e40af';
+                }
+
+                selectedVehicle = this;
+                this.element.style.border = '3px solid #fbbf24';
+
+                this.showDetails();
+            }
+
+            showDetails() {
+                const details = document.getElementById('vehicleDetails');
+                const content = document.getElementById('vehicleDetailsContent');
+                
+                content.innerHTML = `
+                    <p><strong>ID:</strong> ${this.id}</p>
+                    <p><strong>Origine:</strong> ${landmarks[this.origin].name}</p>
+                    <p><strong>Destination:</strong> ${landmarks[this.destination].name}</p>
+                    <p><strong>Vitesse:</strong> ${Math.round(this.speed)} km/h</p>
+                    <p><strong>Statut:</strong> ${this.status === 'moving' ? '🚗 En mouvement' : '🚫 Arrêté'}</p>
+                    ${this.status === 'stopped' ? `<p><strong>Arrêté depuis:</strong> ${Math.round(this.stoppedTime/1000)}s</p>` : ''}
+                    ${this.blockedBy ? '<p><strong>Bloqué par:</strong> 🚧 Obstacle</p>' : ''}
+                `;
+                
+                details.style.display = 'block';
+                this.updateProgress();
+            }
+
+            reachDestination() {
+                logActivity(`🎯 ${this.id} a atteint ${landmarks[this.destination].name}`, 'success');
+                
+                // Supprimer les éléments visuels
+                this.element.remove();
+                this.trail.forEach(t => t.element && t.element.remove());
+                
+                // Supprimer la route du SVG
+                const routeElements = document.querySelectorAll(`[data-vehicle="${this.id}"], [data-vehicle="${this.id}-alt"]`);
+                routeElements.forEach(el => el.remove());
+                
+                vehicles.delete(this.id);
+                
+                if (selectedVehicle === this) {
+                    selectedVehicle = null;
+                    document.getElementById('vehicleDetails').style.display = 'none';
+                }
+                
+                updateMetrics();
+            }
+        }
+
+        class Obstacle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.id = 'obs-' + Date.now();
+                this.element = null;
+                this.createDOMElement();
+            }
+
+            createDOMElement() {
+                this.element = document.createElement('div');
+                this.element.className = 'obstacle';
+                this.element.style.left = (this.x - 2) + '%'; // Centrer l'obstacle
+                this.element.style.top = (this.y - 2) + '%';
+                this.element.title = 'Obstacle - Double-clic pour supprimer';
+                
+                this.element.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    this.remove();
+                });
+
+                document.getElementById('yaoundeMap').appendChild(this.element);
+            }
+
+            remove() {
+                this.element.remove();
+                obstacles.delete(this);
+                
+                // Reprendre le mouvement des véhicules en attente pour cet obstacle
+                vehicles.forEach(vehicle => {
+                    if (vehicle.blockedBy === this) {
+                        if (vehicle.status === 'waiting_for_clearance' || vehicle.status === 'blocked_permanently') {
+                            vehicle.resumeAfterObstacleRemoval();
+                        } else if (vehicle.status === 'stopped') {
+                            vehicle.resume();
+                        }
+                    }
+                });
+                
+                updateMetrics();
+                logActivity(`🧹 Obstacle supprimé - véhicules reprennent leur route`, 'success');
+            }
+        }
+
+        // ==========================================
+        // FONCTIONS DE SIMULATION
+        // ==========================================
+
+        function startSimulation() {
+            if (simulationRunning) return;
+            
+            simulationRunning = true;
+            logActivity('🚀 Simulation démarrée', 'success');
+            simulationLoop();
+        }
+
+        function pauseSimulation() {
+            simulationRunning = false;
+            logActivity('⏸️ Simulation en pause', 'warning');
+        }
+
+        function stopSimulation() {
+            simulationRunning = false;
+            
+            // Supprimer tous les véhicules
+            vehicles.forEach(vehicle => {
+                vehicle.element.remove();
+                vehicle.trail.forEach(t => t.element && t.element.remove());
+            });
+            vehicles.clear();
+            
+            // Supprimer toutes les routes du SVG
+            document.getElementById('routeSVG').innerHTML = '';
+            
+            // Nettoyer les obstacles
+            obstacles.forEach(obstacle => obstacle.element.remove());
+            obstacles.clear();
+            
+            // Réinitialiser l'interface
+            selectedVehicle = null;
+            document.getElementById('vehicleDetails').style.display = 'none';
+            hideAlternativePanel();
+            
+            logActivity('⏹️ Simulation arrêtée et réinitialisée', 'info');
+            updateMetrics();
+        }
+
+        function simulationLoop() {
+            if (!simulationRunning) return;
+
+            // Déplacer tous les véhicules
+            vehicles.forEach(vehicle => {
+                vehicle.move();
+            });
+
+            updateMetrics();
+            setTimeout(simulationLoop, 100);
+        }
+
+        function calculateRoute() {
+            const vehicleId = document.getElementById('vehicleId').value;
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+
+            if (!vehicleId.trim()) {
+                logActivity('⚠️ Veuillez saisir un ID de véhicule valide', 'warning');
+                return;
+            }
+
+            if (origin === destination) {
+                logActivity('⚠️ L\'origine et la destination doivent être différentes', 'warning');
+                return;
+            }
+
+            // Vérifier si le véhicule existe déjà
+            if (vehicles.has(vehicleId)) {
+                logActivity(`⚠️ Le véhicule ${vehicleId} existe déjà`, 'warning');
+                return;
+            }
+
+            logActivity(`🔍 Calcul d'itinéraire pour ${vehicleId}: ${landmarks[origin].name} → ${landmarks[destination].name}`, 'info');
+            
+            // Créer et lancer le véhicule
+            const vehicle = new Vehicle(vehicleId, origin, destination);
+            vehicles.set(vehicleId, vehicle);
+            
+            // Sélectionner automatiquement le nouveau véhicule
+            vehicle.select();
+            
+            // Démarrer la simulation si elle n'est pas en cours
+            if (!simulationRunning) {
+                startSimulation();
+            }
+            
+            logActivity(`✅ Véhicule ${vehicleId} créé et itinéraire tracé`, 'success');
+            updateMetrics();
+            
+            // Incrémenter le compteur pour le prochain véhicule
+            vehicleCounter++;
+            document.getElementById('vehicleId').value = `VEH-${String(vehicleCounter).padStart(3, '0')}`;
+        }
+
+        // ==========================================
+        // GESTION DES OBSTACLES
+        // ==========================================
+
+        function enableObstacleMode() {
+            obstacleMode = !obstacleMode;
+            const btn = document.getElementById('enableObstacleMode');
+            const map = document.getElementById('yaoundeMap');
+            
+            if (obstacleMode) {
+                btn.textContent = '❌ Désactiver Mode';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-warning');
+                map.style.cursor = 'crosshair';
+                logActivity('🚧 Mode placement d\'obstacles activé', 'info');
+            } else {
+                btn.textContent = '📍 Placer Obstacle';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-danger');
+                map.style.cursor = 'default';
+                logActivity('🚧 Mode placement d\'obstacles désactivé', 'info');
+            }
+        }
+
+        function clearObstacles() {
+            const count = obstacles.size;
+            obstacles.forEach(obstacle => obstacle.remove());
+            obstacles.clear();
+            updateMetrics();
+            logActivity(`🧹 ${count} obstacle(s) supprimé(s)`, 'info');
+        }
+
+        function placeObstacle(event) {
+            if (!obstacleMode) return;
+            
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            
+            const obstacle = new Obstacle(x, y);
+            obstacles.add(obstacle);
+            
+            updateMetrics();
+            logActivity(`🚧 Obstacle placé à (${Math.round(x)}, ${Math.round(y)})`, 'warning');
+            
+            // Vérifier si des véhicules sont maintenant bloqués
+            vehicles.forEach(vehicle => {
+                if (vehicle.status === 'moving' && vehicle.checkObstacles()) {
+                    vehicle.stop('obstacle');
+                }
+            });
+        }
+
+        // ==========================================
+        // GESTION DES ALTERNATIVES
+        // ==========================================
+
+        function showAlternativePanel(vehicle, alternatives) {
+            const panel = document.getElementById('alternativesPanel');
+            const list = document.getElementById('alternativesList');
+            
+            list.innerHTML = '';
+            
+            alternatives.forEach((alt, index) => {
+                const option = document.createElement('div');
+                option.className = 'alternative-option';
+                option.innerHTML = `
+                    <h4 style="color: #059669; margin-bottom: 8px;">${alt.name}</h4>
+                    <p><strong>Distance:</strong> ~${alt.distance.toFixed(1)} unités</p>
+                    <p><strong>Temps estimé:</strong> ${alt.time.toFixed(0)} min</p>
+                    <p><strong>Confiance:</strong> ${(alt.confidence * 100).toFixed(0)}%</p>
+                    <p><strong>Avantage:</strong> Évite l'obstacle principal</p>
+                `;
+                
+                option.addEventListener('click', () => {
+                    // Retirer la sélection précédente
+                    document.querySelectorAll('.alternative-option').forEach(opt => 
+                        opt.classList.remove('selected'));
+                    
+                    // Sélectionner cette option
+                    option.classList.add('selected');
+                    option.dataset.altIndex = index;
+                    
+                    // Feedback visuel amélioré
+                    option.style.transform = 'scale(1.02)';
+                    setTimeout(() => {
+                        option.style.transform = '';
+                    }, 150);
+                    
+                    logActivity(`📍 Alternative "${alt.name}" sélectionnée`, 'info');
+                });
+                
+                list.appendChild(option);
+            });
+            
+            panel.classList.add('show');
+            
+            // Stocker les données pour les boutons
+            panel.dataset.vehicleId = vehicle.id;
+            panel.dataset.alternatives = JSON.stringify(alternatives);
+            
+            // Timer de 30 secondes
+            if (alternativeTimer) clearTimeout(alternativeTimer);
+            alternativeTimer = setTimeout(() => {
+                hideAlternativePanel();
+                logActivity('⏰ Proposition d\'alternative expirée', 'warning');
+            }, 30000);
+        }
+
+        function hideAlternativePanel() {
+            document.getElementById('alternativesPanel').classList.remove('show');
+            if (alternativeTimer) {
+                clearTimeout(alternativeTimer);
+                alternativeTimer = null;
+            }
+        }
+
+        function acceptAlternative() {
+            const panel = document.getElementById('alternativesPanel');
+            const selected = document.querySelector('.alternative-option.selected');
+            
+            if (!selected) {
+                logActivity('⚠️ Veuillez sélectionner une alternative en cliquant dessus', 'warning');
+                // Ajouter un effet visuel pour indiquer qu'il faut sélectionner
+                document.querySelectorAll('.alternative-option').forEach(opt => {
+                    opt.style.animation = 'shake 0.5s ease-in-out';
+                });
+                setTimeout(() => {
+                    document.querySelectorAll('.alternative-option').forEach(opt => {
+                        opt.style.animation = '';
+                    });
+                }, 500);
+                return;
+            }
+            
+            const vehicleId = panel.dataset.vehicleId;
+            const alternatives = JSON.parse(panel.dataset.alternatives);
+            const altIndex = parseInt(selected.dataset.altIndex);
+            
+            const vehicle = vehicles.get(vehicleId);
+            const alternative = alternatives[altIndex];
+            
+            if (vehicle && alternative) {
+                logActivity(`✅ Alternative "${alternative.name}" sélectionnée pour ${vehicleId}`, 'success');
+                
+                // Passer le type d'alternative pour l'affichage
+                vehicle.acceptAlternative(alternative.path, alternative.name, alternative.type);
+                updateMetrics();
+                
+                // Log spécifique selon le type d'alternative
+                if (alternative.type === 'roundabout_detour') {
+                    logActivity(`🔄 ${vehicleId} rebrousse chemin vers le Rond-Point Central`, 'info');
+                } else if (alternative.type === 'neighborhood_detour') {
+                    logActivity(`🌆 ${vehicleId} emprunte un détour via un autre quartier`, 'info');
+                } else {
+                    logActivity(`🛣️ ${vehicleId} prend un contournement direct`, 'info');
+                }
+            } else {
+                logActivity('❌ Erreur lors de l\'application de l\'alternative', 'error');
+            }
+        }
+
+        function rejectAlternative() {
+            const panel = document.getElementById('alternativesPanel');
+            const vehicleId = panel.dataset.vehicleId;
+            const vehicle = vehicles.get(vehicleId);
+            
+            if (vehicle) {
+                vehicle.rejectAlternative();
+                updateMetrics();
+            }
+        }
+
+        function ignoreAlternative() {
+            const panel = document.getElementById('alternativesPanel');
+            const vehicleId = panel.dataset.vehicleId;
+            const vehicle = vehicles.get(vehicleId);
+            
+            if (vehicle) {
+                vehicle.waitForObstacleRemoval();
+                updateMetrics();
+            }
+        }
+
+        // ==========================================
+        // FONCTIONS UTILITAIRES
+        // ==========================================
+
+        function updateMetrics() {
+            document.getElementById('activeVehicles').textContent = vehicles.size;
+            document.getElementById('obstacleCount').textContent = obstacles.size;
+            
+            const stoppedVehicles = Array.from(vehicles.values()).filter(v => 
+                v.status === 'stopped' || v.status === 'waiting' || v.status === 'broken_down').length;
+            document.getElementById('trafficJams').textContent = stoppedVehicles;
+            
+            // Alternative count (simulation)
+            document.getElementById('alternativesCount').textContent = 
+                document.getElementById('alternativesPanel').classList.contains('show') ? 1 : 0;
+        }
+
+        // Fonction globale pour réparer un véhicule
+        function repairVehicle(vehicleId) {
+            const vehicle = vehicles.get(vehicleId);
+            if (vehicle && vehicle.status === 'broken_down') {
+                vehicle.forceRestart();
+                updateMetrics();
+            }
+        }
+
+        // Rendre la fonction accessible globalement
+        window.repairVehicle = repairVehicle;
+
+        function logActivity(message, type = 'info') {
+            const log = document.getElementById('activityLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            
+            // Limiter à 30 entrées
+            const entries = log.querySelectorAll('.log-entry');
+            if (entries.length > 30) {
+                entries[0].remove();
+            }
+        }
+
+        // ==========================================
+        // INITIALISATION
+        // ==========================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Event listeners
+            document.getElementById('startSimulation').addEventListener('click', startSimulation);
+            document.getElementById('pauseSimulation').addEventListener('click', pauseSimulation);
+            document.getElementById('stopSimulation').addEventListener('click', stopSimulation);
+            document.getElementById('calculateRoute').addEventListener('click', calculateRoute);
+            
+            // Gestion des obstacles
+            document.getElementById('enableObstacleMode').addEventListener('click', enableObstacleMode);
+            document.getElementById('clearObstacles').addEventListener('click', clearObstacles);
+            document.getElementById('yaoundeMap').addEventListener('click', placeObstacle);
+            
+            // Alternatives
+            document.getElementById('acceptAlternative').addEventListener('click', acceptAlternative);
+            document.getElementById('rejectAlternative').addEventListener('click', rejectAlternative);
+            document.getElementById('ignoreAlternative').addEventListener('click', ignoreAlternative);
+            
+            // Slider de vitesse
+            const speedSlider = document.getElementById('simulationSpeed');
+            const speedValue = document.getElementById('speedValue');
+            
+            speedSlider.addEventListener('input', function() {
+                simulationSpeed = parseInt(this.value);
+                speedValue.textContent = simulationSpeed + 'x';
+            });
+            
+            // Clic en dehors pour désélectionner
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.vehicle') && !e.target.closest('#vehicleDetails')) {
+                    if (selectedVehicle) {
+                        selectedVehicle.element.style.border = '2px solid #1e40af';
+                        selectedVehicle = null;
+                        document.getElementById('vehicleDetails').style.display = 'none';
+                    }
+                }
+            });
+            
+            // Initialisation
+            logActivity('🎮 Simulateur avancé de circulation initialisé', 'success');
+            logActivity('💡 Sélectionnez origine/destination et cliquez "Calculer & Lancer"', 'info');
+            logActivity('🚧 Activez le mode obstacle pour placer des embouteillages', 'info');
+            updateMetrics();
+            
+            // Simulation de données initiales
+            setTimeout(() => {
+                logActivity('📡 Connexion à l\'API Spring Boot simulée', 'success');
+                logActivity('🗄️ Base ScyllaDB prête', 'success');
+                logActivity('🌍 Données OpenStreetMap chargées', 'success');
+            }, 1500);
+        });
+
+        // ==========================================
+        // FONCTIONS AVANCÉES
+        // ==========================================
+
+        function addRandomTraffic() {
+            const locations = Object.keys(landmarks);
+            const origin = locations[Math.floor(Math.random() * locations.length)];
+            const destinations = locations.filter(loc => loc !== origin);
+            const destination = destinations[Math.floor(Math.random() * destinations.length)];
+            
+            const vehicleId = `VEH-${String(vehicleCounter++).padStart(3, '0')}`;
+            const vehicle = new Vehicle(vehicleId, origin, destination);
+            vehicles.set(vehicleId, vehicle);
+            
+            logActivity(`🚗 Véhicule automatique ${vehicleId} ajouté`, 'info');
+            updateMetrics();
+        }
+
+        function simulateRushHour() {
+            logActivity('🕐 Simulation d\'heure de pointe démarrée', 'warning');
+            
+            // Ajouter plusieurs véhicules rapidement
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => addRandomTraffic(), i * 2000);
+            }
+            
+            // Placer quelques obstacles automatiquement
+            setTimeout(() => {
+                const obstacle1 = new Obstacle(45, 35);
+                obstacles.add(obstacle1);
+                logActivity('🚧 Obstacle automatique placé (simulation accident)', 'error');
+                updateMetrics();
+            }, 5000);
+        }
+
+        function exportSimulationData() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                vehicles: Array.from(vehicles.entries()).map(([id, vehicle]) => ({
+                    id,
+                    origin: vehicle.origin,
+                    destination: vehicle.destination,
+                    currentPosition: vehicle.currentPosition,
+                    status: vehicle.status,
+                    progress: (vehicle.traveledDistance / vehicle.totalDistance) * 100
+                })),
+                obstacles: Array.from(obstacles).map(obs => ({
+                    id: obs.id,
+                    position: { x: obs.x, y: obs.y }
+                })),
+                metrics: {
+                    activeVehicles: vehicles.size,
+                    obstacleCount: obstacles.size,
+                    stoppedVehicles: Array.from(vehicles.values()).filter(v => v.status === 'stopped').length
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `yaounde_traffic_simulation_${Date.now()}.json`;
+            a.click();
+            
+            logActivity('📁 Données de simulation exportées', 'success');
+        }
+
+        function testAPIEndpoints() {
+            const endpoints = [
+                'POST /api/v1/traffic/route/calculate',
+                'POST /api/v1/traffic/position/update',
+                'GET /api/v1/traffic/segment/{id}/conditions',
+                'POST /api/v1/traffic/alternative/{id}/respond',
+                'GET /api/v1/traffic/vehicle/{id}/analysis'
+            ];
+            
+            endpoints.forEach((endpoint, index) => {
+                setTimeout(() => {
+                    logActivity(`🔌 Test API: ${endpoint} - ✅ Succès`, 'success');
+                }, index * 500);
+            });
+        }
+
+        // Raccourcis clavier
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 'e':
+                        e.preventDefault();
+                        exportSimulationData();
+                        break;
+                    case 'r':
+                        e.preventDefault();
+                        simulateRushHour();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        if (simulationRunning) pauseSimulation();
+                        else startSimulation();
+                        break;
+                    case 'o':
+                        e.preventDefault();
+                        enableObstacleMode();
+                        break;
+                }
+            }
+            
+            // Échap pour fermer les alternatives
+            if (e.key === 'Escape') {
+                hideAlternativePanel();
+            }
+        });
+
+        // Auto-test après 3 secondes
+        setTimeout(testAPIEndpoints, 3000);
+
+        // Simulation automatique d'activité après 10 secondes
+        setTimeout(() => {
+            if (vehicles.size === 0) {
+                logActivity('🤖 Démarrage automatique d\'une démonstration', 'info');
+                
+                // Créer un véhicule de démonstration
+                document.getElementById('origin').value = 'poste_centrale';
+                document.getElementById('destination').value = 'cradat';
+                calculateRoute();
+                
+                // Placer un obstacle après 8 secondes
+                setTimeout(() => {
+                    if (vehicles.size > 0) {
+                        const obstacle = new Obstacle(50, 18); // Sur la route principale
+                        obstacles.add(obstacle);
+                        logActivity('🚧 Obstacle de démonstration placé', 'warning');
+                        updateMetrics();
+                    }
+                }, 8000);
+            }
+        }, 10000);
+
+        // Messages d'aide
+        function showHelp() {
+            const helpText = `
+                🚗 AIDE - Simulateur Avancé Yaoundé
+                
+                ⌨️ Raccourcis clavier:
+                • Ctrl+S : Démarrer/Pause simulation
+                • Ctrl+O : Activer mode obstacle
+                • Ctrl+R : Simuler heure de pointe
+                • Ctrl+E : Exporter données
+                • Échap : Fermer popup alternatives
+                
+                🎮 Utilisation:
+                1. Choisir origine/destination
+                2. Cliquer "Calculer & Lancer"
+                3. Observer le véhicule se déplacer
+                4. Placer des obstacles (mode obstacle)
+                5. Attendre 5 minutes pour voir les alternatives
+                
+                🚧 Obstacles:
+                • Clic simple : placer obstacle
+                • Double-clic : supprimer obstacle
+                
+                🚗 Véhicules:
+                • Clic : sélectionner et voir détails
+                • Suivi du trajet avec trail visuel
+                • Barre de progression du voyage
+            `;
+            
+            alert(helpText);
+        }
+
+        // Fonction globale pour l'aide
+        window.showHelp = showHelp;
+
+        // Animation de démarrage
+        function startupAnimation() {
+            const landmarks = document.querySelectorAll('.landmark');
+            landmarks.forEach((landmark, index) => {
+                landmark.style.opacity = '0';
+                landmark.style.transform = 'scale(0.5)';
+                
+                setTimeout(() => {
+                    landmark.style.transition = 'all 0.5s ease';
+                    landmark.style.opacity = '1';
+                    landmark.style.transform = 'scale(1)';
+                }, index * 200);
+            });
+        }
+
+        // Lancer l'animation au chargement
+        setTimeout(startupAnimation, 500);
+
+        // Fonction pour afficher les statistiques détaillées
+        function showDetailedStats() {
+            if (vehicles.size === 0) {
+                logActivity('📊 Aucune donnée de véhicule disponible', 'warning');
+                return;
+            }
+
+            const movingVehicles = Array.from(vehicles.values()).filter(v => v.status === 'moving').length;
+            const stoppedVehicles = Array.from(vehicles.values()).filter(v => v.status === 'stopped').length;
+            const avgProgress = Array.from(vehicles.values())
+                .reduce((sum, v) => sum + (v.traveledDistance / v.totalDistance), 0) / vehicles.size * 100;
+
+            const stats = `
+                📊 STATISTIQUES DÉTAILLÉES
+                
+                🚗 Véhicules: ${vehicles.size} total
+                • En mouvement: ${movingVehicles}
+                • Arrêtés: ${stoppedVehicles}
+                • Progression moyenne: ${avgProgress.toFixed(1)}%
+                
+                🚧 Obstacles: ${obstacles.size}
+                
+                📈 Performance système:
+                • Vitesse simulation: ${simulationSpeed}x
+                • Statut: ${simulationRunning ? 'En cours' : 'Arrêtée'}
+            `;
+
+            logActivity('📊 Statistiques détaillées générées', 'info');
+            alert(stats);
+        }
+
+        // Bouton d'aide et stats (ajouter à l'interface si nécessaire)
+        window.showDetailedStats = showDetailedStats;
+    </script>
+</body>
+</html>
